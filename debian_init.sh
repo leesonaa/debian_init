@@ -1,6 +1,8 @@
 #!/bin/bash
 
 ipaddr=$(ip a | grep /24 | awk '{print $2}' | awk -F "/" '{print $1}')
+appdata_path=""
+compose_path=""
 
 mainmenu(){
 
@@ -16,6 +18,7 @@ echo -e " 2 \033[36m安装实用工具\033[0m"
 echo -e " 3 \033[32m安装webmin\033[0m"
 echo -e " 4 \033[32m安装docker环境\033[0m"
 echo -e " 5 \033[34m一键安装上面所有内容\033[0m"
+echo -e " 6 \033[34m安装dockge容器管理\033[0m"
 echo -----------------------------------------------
 echo -e " 0 \033[31m退出脚本\033[0m"
 read -p "请输入对应数字 > " num
@@ -37,6 +40,8 @@ elif [ "$num" = 4 ]; then
 elif [ "$num" = 5 ]; then
 	echo "正在安装上面所有内容..."
 	onekey
+elif [ "$num" = 6 ]; then
+	echo "正在安装dockge管理面板..."
 else
 	echo -e "\033[31m请输入正确的数字！\033[0m"
 fi
@@ -88,5 +93,53 @@ onekey(){
 	install_webmin
 	install_docker
 }
+
+check_path_exist() {
+    local path="$1"
+
+    if [ -e "$path" ]; then
+        return 0  # 路径存在返回 0 true
+    else
+        return 1  # 路径不存在返回 1 false
+    fi
+}
+
+install_dockge(){
+if command -v docker >/dev/null 2>&1; then
+		while true; do
+    	read -p "请输入容器配置存放路径（以/开始的绝对路径）: " path_app
+    	if ! check_path_exist "$path_app"; then
+        echo "你输入的不是绝对路径,请重新输入！"
+    	else
+        echo "你输入的绝对路径是: $path_app"
+        appdata_path=$path_app
+        break 
+    	fi
+		done
+		while true; do
+    	read -p "请输入compose持久化存放路径: " path_compose
+    	if ! check_path_exist "$path_compose"; then
+        echo "你输入的不是绝对路径,请重新输入！"
+    	else
+        echo "你输入的绝对路径是: $path_compose"
+        compose_path=$path_compose
+        break  
+    	fi
+		done
+	docker run -d --restart unless-stopped -p 5001:5001 -v /var/run/docker.sock:/var/run/docker.sock -v $appdata_path:/app/data -v $compose_path:/opt/stacks -e DOCKGE_STACKS_DIR=/opt/stacks louislam/dockge
+	echo "请等待个20秒"
+	sleep 20
+	res=$(docker ps -a | grep dockge | awk '{print $8}')
+	if [[ $res = Up ]]; then 
+	echo -e " \033[32mdockge安装成功，请用https://$ipaddr:5001 访问后台\033[0m"
+	else
+		echo "请检查dockge是否运行成功"
+		docker ps -a | grep dockge
+	fi
+else
+		echo "请先执行安装docker服务"
+fi	
+}
+
 
 mainmenu
