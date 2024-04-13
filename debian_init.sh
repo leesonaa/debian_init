@@ -42,6 +42,7 @@ elif [ "$num" = 5 ]; then
 	onekey
 elif [ "$num" = 6 ]; then
 	echo "正在安装dockge管理面板..."
+	install_dockge
 else
 	echo -e "\033[31m请输入正确的数字！\033[0m"
 fi
