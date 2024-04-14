@@ -33,23 +33,30 @@ mainmenu() {
 	elif [ "$num" = 1 ]; then
 		echo "正在更换国内中科大源..."
 		change_repo
+		mainmenu
 	elif [ "$num" = 2 ]; then
 		echo "正在安装实用工具..."
 		install_tool
+		mainmenu
 	elif [ "$num" = 3 ]; then
 		install_webmin
+		mainmenu
 	elif [ "$num" = 4 ]; then
 		install_docker
+		mainmenu
 	elif [ "$num" = 5 ]; then
 		echo "正在安装上面所有内容..."
 		onekey
+		mainmenu
 	elif [ "$num" = 6 ]; then
 		echo "正在安装dockge管理面板..."
 		install_dockge
+		mainmenu
 	else
 		echo -e "\033[31m请输入正确的数字！\033[0m"
+		mainmenu
 	fi
-	mainmenu
+	
 }
 
 check_dockge_installed() {
