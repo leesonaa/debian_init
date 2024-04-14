@@ -16,12 +16,12 @@ mainmenu() {
 	echo -e " 1 \033[36m更换国内中科大源\033[0m"
 	echo -e " 2 \033[36m安装实用工具\033[0m"
 	webmin_installed=$(check_webmin_installed)
-	echo -e " 3 \033[32m安装webmin — [$webmin_installed]\033[0m"
+	echo -e " 3 \033[32m安装webmin — $webmin_installed\033[0m"
 	docker_installed=$(check_docker_installed)
-	echo -e " 4 \033[32m安装docker环境 — [$docker_installed]\033[0m"
+	echo -e " 4 \033[32m安装docker环境 — $docker_installed\033[0m"
 	echo -e " 5 \033[34m一键安装上面所有内容\033[0m"
 	dockge_installed=$(check_dockge_installed)
-	echo -e " 6 \033[34m安装dockge容器管理 — [$dockge_installed]\033[0m"
+	echo -e " 6 \033[34m安装dockge容器管理 — $dockge_installed\033[0m"
 	echo -----------------------------------------------
 	echo -e " 0 \033[31m退出脚本\033[0m"
 	read -p "请输入对应数字 > " num
@@ -61,25 +61,25 @@ mainmenu() {
 
 check_dockge_installed() {
     if docker ps -a --format '{{.Names}}' | grep -q '^dockge$'; then
-        echo -e "\033[32m已安装\033[0m"
+        echo -e "\033[32m[已安装]\033[0m"
     else
-        echo -e "\033[31m未安装\033[0m"
+        echo -e "\033[31m[未安装]\033[0m"
     fi
 }
 
 check_docker_installed() {
     if command -v docker >/dev/null 2>&1; then
-        echo -e "\033[32m已安装\033[0m"
+        echo -e "\033[32m[已安装]\033[0m"
     else
-        echo -e "\033[31m未安装\033[0m"
+        echo -e "\033[31m[未安装]\033[0m"
     fi
 }
 
 check_webmin_installed() {
     if command -v webmin >/dev/null 2>&1; then
-        echo -e "\033[32m已安装\033[0m"
+        echo -e "\033[32m[已安装]\033[0m"
     else
-        echo -e "\033[31m未安装\033[0m"
+        echo -e "\033[31m[未安装]\033[0m"
     fi
 }
 
@@ -161,7 +161,7 @@ install_dockge() {
 				break
 			fi
 		done
-			
+		docker run -d --name dockge --restart unless-stopped -p 5001:5001 -v /var/run/docker.sock:/var/run/docker.sock -v "$appdata_path":/app/data -v "$compose_path":/opt/stacks -e DOCKGE_STACKS_DIR=/opt/stacks louislam/dockge	
 		if [[ $? == 0 ]]; then
 			echo -e " \033[32mdockge安装成功，请用\033[0m\033[33;1;5mhttp://$ipaddr:5001\033[0m\033[32m访问后台\033[0m"
 			echo "================================================================="
