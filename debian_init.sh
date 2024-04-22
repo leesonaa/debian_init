@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright © 2024 leeson All rights reserved.
 
 ipaddr=$(ip a | grep /24 | awk '{print $2}' | awk -F "/" '{print $1}')
 appdata_path=""
