@@ -3,7 +3,9 @@
 ipaddr=$(ip a | grep /24 | awk '{print $2}' | awk -F "/" '{print $1}')
 appdata_path=""
 compose_path=""
-mainmenu() {
+
+
+function mainmenu() {
 
 	echo -e " \033[33;1;5m<欢迎使用 debian12一键初始化建议脚本>\033[0m"
 	echo " --------------------------------------"
@@ -23,6 +25,7 @@ mainmenu() {
 	echo -e " 5 \033[34m一键安装上面所有内容\033[0m"
 	dockge_installed=$(check_dockge_installed)
 	echo -e " 6 \033[34m安装dockge容器管理 — $dockge_installed\033[0m"
+	echo -e " 7 \033[33m设置静态IP地址\033[0m"
 	echo -----------------------------------------------
 	echo -e " 0 \033[31m退出脚本\033[0m"
 	read -p "请输入对应数字 > " num
@@ -51,6 +54,9 @@ mainmenu() {
 	elif [ "$num" = 6 ]; then
 		
 		install_dockge
+	elif [ "$num" = 7 ]; then
+		
+		set_static_addree
 		
 	else
 		echo -e "\033[31m请输入正确的数字！\033[0m"
@@ -60,7 +66,7 @@ mainmenu() {
 	
 }
 
-check_dockge_installed() {
+function check_dockge_installed() {
     if [ "$(check_docker_installed)" == "[已安装]" ] && docker ps -a --format '{{.Names}}' | grep -q '^dockge$'; then
         echo -e "[已安装]"
     else
@@ -68,7 +74,7 @@ check_dockge_installed() {
     fi
 }
 
-check_docker_installed() {
+function check_docker_installed() {
     if command -v docker >/dev/null 2>&1; then
         echo -e "[已安装]"
     else
@@ -76,7 +82,7 @@ check_docker_installed() {
     fi
 }
 
-check_webmin_installed() {
+function check_webmin_installed() {
     if command -v webmin >/dev/null 2>&1; then
         echo -e "[已安装]"
     else
@@ -84,7 +90,7 @@ check_webmin_installed() {
     fi
 }
 
-check_repo_changed(){
+function check_repo_changed(){
 	if grep -q "ustc" /etc/apt/sources.list; then
 	    echo "[已更换]"   
 	else
@@ -93,7 +99,7 @@ check_repo_changed(){
 }
 
 
-change_repo() {
+function change_repo() {
 	if [ "$(check_repo_changed)" == "[已更换]" ]; then
 		echo "你已经换过了..."
 	else
@@ -110,7 +116,7 @@ EOF
 	fi
 }
 
-install_tool() {
+function install_tool() {
 
 	if [ "$(check_repo_changed)" == "[已更换]" ]; then
 		echo "正在安装实用工具..."
@@ -122,7 +128,7 @@ install_tool() {
 	fi
 }
 
-install_webmin() {
+function install_webmin() {
 	if [ "$(check_webmin_installed)" == "[已安装]" ]; then
 		echo "你已经安装过了..."
 	elif [ "$(check_repo_changed)" == "[已更换]" ]; then
@@ -137,7 +143,7 @@ install_webmin() {
 	fi
 }
 
-install_docker() {
+function install_docker() {
 	if [ "$(check_docker_installed)" == "[已安装]" ]; then
 		echo "你已经安装过了..."
 	elif [ "$(check_repo_changed)" == "[已更换]" ]; then
@@ -150,7 +156,7 @@ install_docker() {
 
 }
 
-onekey() {
+function onekey() {
 	echo "准备更改repo,安装工具,安装docker服务,安装dockge容器..."
 	change_repo
 	install_tool
@@ -158,7 +164,7 @@ onekey() {
 	install_webmin
 }
 
-check_path_exist() {
+function check_path_exist() {
 	local path="$1"
 	if [ -e "$path" ]; then
 		return 0 # 路径存在返回 0 true
@@ -167,7 +173,7 @@ check_path_exist() {
 	fi
 }
 
-install_dockge() {
+function install_dockge() {
 	if [ "$(check_dockge_installed)" == "[已安装]" ]; then
 		echo "dockge服务已经运行了..."
 	elif [ "$(check_docker_installed)" == "[已安装]" ]; then
@@ -203,6 +209,30 @@ install_dockge() {
 	else
 		echo "请先执行安装docker服务"
 	fi
+}
+
+
+function set_static_addree(){
+
+	# 获取接口
+	 interface=$(ip route | grep default | awk '{print $5}')
+	 mv /etc/network/interfaces /etc/network/interfaces.bak
+	 read -p "请输入你要设置的静态ip地址 如(192.168.1.10) :" ip_address
+	 read -p "请输入你的网关地址 如(192.168.1.1) :" ip_gateway
+	 cat << EOF > /etc/network/interfaces
+
+auto lo
+iface lo inet loopback
+
+auto $interface
+iface $interface inet static
+address $ip_address
+netmask 255.255.255.0
+gateway $ip_gateway
+
+EOF
+	sudo systemctl restart NetworkManager
+	echo "静态ip已经设置完成，请退出脚本并reboot"
 }
 
 mainmenu
