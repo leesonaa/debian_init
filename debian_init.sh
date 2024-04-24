@@ -113,7 +113,7 @@ deb https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free
 deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
 EOF
 	echo -e " \033[32m 中科大源替换完成,正在更新系统...\033[0m"
-	apt update && apt upgrade -y && apt install nala
+	apt update && apt upgrade -y && apt install nala -y
 	fi
 }
 
