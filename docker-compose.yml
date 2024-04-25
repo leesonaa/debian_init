@@ -47,7 +47,7 @@ services:
     environment:
       <<: *env
     ports:
-      - 84:80
+      - 84:3000
     <<: *conf
 
 
@@ -235,8 +235,8 @@ services:
       <<: *env
       MYSQL_ROOT_PASSWORD: "webos"                  # 数据库root密码
       MYSQL_DATABASE: "webos"                         # 数据库 名
-      #MYSQL_USER: "webos"                          # 数据库 用户
-      #MYSQL_PASSWORD: "webos"                       # 数据库用户 密码
+      MYSQL_USER: "webos"                          # 数据库 用户
+      MYSQL_PASSWORD: "webos"                       # 数据库用户 密码
     <<: *conf
 
   webosredis:
