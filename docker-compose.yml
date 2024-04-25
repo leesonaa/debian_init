@@ -264,6 +264,7 @@ services:
     image: qdtoday/qd
     container_name: qiandao
     labels:
+      com.centurylinklabs.watchtower.enable: true
     ports:
       - 8923:80
     volumes:
