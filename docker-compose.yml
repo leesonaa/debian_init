@@ -1,0 +1,398 @@
+x-config: &conf
+  restart: unless-stopped
+  networks:
+    - mynet   
+ 
+x-environment: &env           # 权限设置
+    TZ: Asia/Shanghai
+    PUID: "1000"
+    PGID: "1000"        
+
+
+
+# ---------------------------------------------------------------------
+#  all_in_one 完整地址 https://github.com/leesonaa/unraid-docker-compose 
+#  请去上述地址增减自己的应用
+#  注意看下面的注释
+#  ©copyright  2024 leeson
+# ---------------------------------------------------------------------
+
+
+
+services:
+
+
+# ---------------------------------------------------------------------
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: "Asia/Shanghai"
+      WATCHTOWER_POLL_INTERVAL: "43200"  # 轮询时间 单位 秒
+      WATCHTOWER_LABEL_ENABLE: "true"   # 监视并更新com.centurylinklabs.watchtower.enable标签设置为 true 的容器  见下面pairdrop 的 labels
+      WATCHTOWER_CLEANUP: "true"         # 清理玄虚镜像
+      WATCHTOWER_REMOVE_VOLUMES: "true"  # 删除匿名卷
+      WATCHTOWER_ROLLING_RESTART: "true" # 每次只停止并更新一个容器
+    network_mode: "host"
+
+
+# ---------------------------------------------------------------------
+  pairdrop:
+    image: linuxserver/pairdrop
+    container_name: pairdrop
+    labels:
+      com.centurylinklabs.watchtower.enable: true  # 带标签 确定watchtower可以定位更新
+    environment:
+      <<: *env
+    ports:
+      - 84:80
+    <<: *conf
+
+
+
+# ---------------------------------------------------------------------
+  jf:
+    image: nyanmisaka/jellyfin         # n大版jf 开箱即用
+    container_name: jellyfin
+    ports: 
+      - "8096:8096"
+    volumes:
+      - ${DATA_PATH}/jellyfin:/config      # 配置文件路径
+      - ${MOVIE_DATA}:/moviedata              # 媒体文件路径
+      - /dev/shm/jf:/cache                           # 缓存进内存
+    <<: *conf
+    environment:
+      <<: *env
+    privileged: true                               # 特权模式
+    devices:
+      - "/dev:/dev"
+
+
+
+# ---------------------------------------------------------------------
+  nt:    
+    image: hsuyelin/nas-tools
+    container_name: nas-tools
+    ports:
+      - 3001:3000
+    volumes:
+      - ${DATA_PATH}/nastools:/config          # 配置路径
+      - ${MOVIE_DATA}:/movie_data                   # 媒体文件和下载目录的公共的上层路径
+    <<: *conf
+    environment:
+      <<: *env
+  
+# ---------------------------------------------------------------------
+  cc:
+    image: easychen/cookiecloud
+    container_name: cookiecloud
+    volumes:
+      - ${DATA_PATH}/cookiecloud:/data/api/data
+    ports:
+      - 8088:8088
+    <<: *conf
+    environment:
+      <<: *env
+
+
+# ---------------------------------------------------------------------
+  qb:                                 # qb启动完成看日志  有随机密码  
+    image: johngong/qbittorrent
+    container_name: qbittorrent
+    ports:
+      - 8989:8989
+      - 6881:6881/tcp
+      - 6881:6881/udp
+    volumes:
+      - ${DATA_PATH}/qbittorrent:/config             # 配置路径
+      - ${MOVIE_DATA}:/Downloads                     # 下载路径
+    environment:
+      UID: "1000"
+      GID: "1000"
+      QB_EE_BIN: "true"      # 这是启动EE增强版 反迅雷吸血
+      QB_WEBUI_PORT: "8989"
+      QB_TRACKERS_UPDATE_AUTO: "true"
+      QB_TRACKERS_LIST_URL: "https://mirror.ghproxy.com/https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt"
+    <<: *conf
+
+
+
+
+# ---------------------------------------------------------------------
+  v2:
+    image: mzz2017/v2raya
+    container_name: v2raya
+    privileged: true
+    ports:
+      - 2017:2017
+      - 20170-20172:20170-20172
+    <<: *conf
+    environment:
+      <<: *env
+      V2RAYA_LOG_FILE: "/tmp/v2raya.log"
+      V2RAYA_V2RAY_BIN: "/usr/local/bin/v2ray"      # 这行注释掉就会默认使用xray-core
+    volumes:
+      - ${DATA_PATH}/v2raya:/etc/v2raya
+      - /lib/modules:/lib/modules:ro
+      - /etc/resolv.conf:/etc/resolv.conf
+
+
+# ---------------------------------------------------------------------
+  wg:
+    image: leesonaa/wgcnv6-easy
+    container_name: wg
+    environment:
+      <<: *env
+      WG_HOST: you.domain.com   # you.domain.com 你的域名地址 不要协议头 ⚠️ 
+      PASSWORD: password          # *必填 web登录密码  ⚠️ 
+      # - WG_PORT=51820               # 可选 如果是bridge的方式部署 这里写容器外的端口号，如果下面的ports那边映射的是11820：51820的话 这里就是11820了
+      # - WG_DEFAULT_ADDRESS_IPV4=10.8.0.x    # 可选 你的wg私网v4网段  最后一个必须是  x 
+      # - WG_DEFAULT_ADDRESS_IPV6=fd42:42:42::x   # 可选 你的wg v6私网网段 最后一个必须是 x 可以保持默认
+      # - WG_DEFAULT_DNS=223.5.5.5,119.29.29.29                 # 可选 默认是阿里云的v4&v6的公共dns地址
+      # - WG_MTU=1420                               # 可选 
+      # - WG_ALLOWED_IPS=192.168.15.0/24, 10.0.1.0/24     # 可选 默认是任何地址0.0.0.0/24 ::0/64
+    volumes:
+      - ${DATA_PATH}/wg:/etc/wireguard
+    ports:
+      - "51820:51820/udp"
+      - "51821:51821/tcp"
+    <<: *conf
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:                                    # ⚠️ 从这里开始  如果是bridge模式 就必须带上这一段 ,v6的话 如果wan侧有v6 lan侧没有 用socat或者lucky 从主路由把入站的udp端口甩过来 
+      - net.ipv4.ip_forward=1                       # 如果是lan测也有v6,也就是宿主机有v6 建议直接host模式 sysctls这段注释掉
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.all.forwarding=1
+      - net.ipv6.conf.default.forwarding=1
+      - net.ipv6.conf.eth0.proxy_ndp=1
+
+
+# ---------------------------------------------------------------------
+  alist:
+    image: xhofe/alist
+    container_name: alist
+    ports:
+      - 5244:5244
+    volumes:
+      - ${DATA_PATH}/alist:/opt/alist/data
+    # - ${MOVIE_DATA}:/mydata            # 这里写自己要共享的路径映射
+    <<: *conf
+    environment:
+      <<: *env
+      PUID: "0"
+      PGID: "0"
+      UMASK: "022"
+
+
+# ---------------------------------------------------------------------
+  cab:
+    image: ypptec/nascab
+    container_name: nascab
+    ports:
+      - 81:80  # http port
+      - 90:90  # webdav port
+    volumes:
+      - ${DATA_PATH}/nascab:/root/.local/share/nascab
+     #- /mnt/user/appdata/photo:/mydata           # 映射自己的数据 比如影音 照片等等
+    <<: *conf
+    environment:
+      <<: *env
+    logging:
+      options:
+        max-size: "10M"
+        max-file: "3"
+
+
+# ---------------------------------------------------------------------
+  webos:
+    image: fs185085781/webos
+    container_name: webos
+    ports:
+      - 8087:8088
+    volumes:
+      - ${DATA_PATH}/webos/config:/webos/api/rootPath   # 配置持久化
+      - ${DATA_PATH}/webos/apps:/webos/web/apps         # 插件app持久化
+    # - ${DATA_PATH}:/mydata       # 挂载宿主
+    <<: *conf
+    environment:
+      <<: *env
+    depends_on:
+      - webosredis
+      - webosdb
+
+  webosdb:
+    image: linuxserver/mariadb
+    container_name: webosdb
+    ports:
+      - 3306:3306
+    volumes:
+      - ${DATA_PATH}/webosdb:/var/lib/mysql          # 数据库文件路径
+    environment:
+      <<: *env
+      MYSQL_ROOT_PASSWORD: "webos"                  # 数据库root密码
+      MYSQL_DATABASE: "webos"                         # 数据库 名
+      #MYSQL_USER: "webos"                          # 数据库 用户
+      #MYSQL_PASSWORD: "webos"                       # 数据库用户 密码
+    <<: *conf
+
+  webosredis:
+    image: redis
+    container_name: webosredis
+    <<: *conf
+    environment:
+      <<: *env
+
+
+
+# ---------------------------------------------------------------------
+  lucky:
+    image: gdy666/lucky
+    container_name: lucky
+    volumes:
+      - ${DATA_PATH}/lucky:/goodluck
+    network_mode: host
+    restart: always
+
+
+
+# ---------------------------------------------------------------------
+  qd:
+    image: qdtoday/qd
+    container_name: qiandao
+    labels:
+    ports:
+      - 8923:80
+    volumes:
+      - ${DATA_PATH}/qiandao:/usr/src/app/config
+    environment:
+      <<: *env
+      PROXIES: "v2:20172"   # 代理地址
+    <<: *conf
+
+
+# ---------------------------------------------------------------------
+  syncthing:
+    image: syncthing/syncthing
+    container_name: syncthing
+    environment:
+      <<: *env
+    volumes:
+      - ${DATA_PATH}/sync:/var/syncthing 
+    network_mode: host
+
+
+
+# ---------------------------------------------------------------------
+  vaultwarden:
+    image: vaultwarden/server
+    container_name: vaultwarden
+    labels:
+      net.unraid.docker.webui: ""  # 你的反向代理域名地址
+    volumes:
+      - ${DATA_PATH}/vaultwarden:/data
+    ports:
+      - 83:80
+    environment:
+      <<: *env
+      #SIGNUPS_ALLOWED: "false"    # 去掉前面的#号 就是禁止注册了，建议注册好自己的主用户后再打开这个选项
+    <<: *conf
+
+
+
+# ---------------------------------------------------------------------
+# user: admin@sun.cc  passwd: 12345678
+  sun-panel:
+    image: hslr/sun-panel
+    container_name: sun-panel
+    volumes:
+    - ${DATA_PATH}/sun-panel/conf:/app/conf
+    - ${DATA_PATH}/sun-panel/uploads:/app/uploads
+    - ${DATA_PATH}/sun-panel/database:/app/database
+    # - ./runtime:/app/runtime   # 日志文件
+    ports:
+    - 3003:3002
+    environment:
+      <<: *env
+    <<: *conf
+
+
+
+# ---------------------------------------------------------------------
+  trilium:   
+    image: nriver/trilium-cn
+    container_name: trilium
+    ports:
+      - 88:8080
+    volumes:
+      - ${DATA_PATH}/trilium-cn:/root/trilium-data
+    environment:
+      <<: *env
+      #TRILIUM_DATA_DIR: "/root/trilium-data"   # 可选，自定义存储路径 注意 是容器内
+    <<: *conf
+
+
+
+# ---------------------------------------------------------------------
+  immich:                              # 前端   using aio project https://github.com/imagegenius/docker-immich
+    container_name: immich
+    image: ghcr.dockerproxy.com/ghcr.io/imagegenius/immich:latest
+    volumes:
+      - ${DATA_PATH}/immich/config:/config         # 配置路径
+      - ${DATA_PATH}/immich/photo:/photos          # 相册
+      #- path_to_imports:/import:ro             # 读取本地已有相册
+    environment:
+      <<: *env
+      DB_HOSTNAME: "immich-postgres"        # pg数据库主机名或者IP
+      DB_USERNAME: "immich"                 # 数据库永用户名
+      DB_PASSWORD: "immich"                 # 数据库密码
+      DB_DATABASE_NAME: "immich"            # 数据库 库名
+      REDIS_HOSTNAME: "immich-redis"        # redis 主机名或者IP
+      #DB_PORT=5432 #optional
+      #REDIS_PORT=6379 #optional
+      #REDIS_PASSWORD= #optional
+      MACHINE_LEARNING_WORKERS: "1" #optional   打开机器学习 老旧设备如果效果不好请关闭 设置为 0
+      MACHINE_LEARNING_WORKER_TIMEOUT: "120" #optional    机器学习超时  120秒
+      #HTTP_PROXY: "http://v2:20172"          # 这2个是给容器传递科学环境的 环境变量 
+      #HTTPS_PROXY: "http://v2:20172"
+    ports:
+      - 2283:8080
+    devices:
+      - /dev/dri:/dev/dri                     # 调用宿主显卡intel qsv 或者 vaapi 人脸识别 转码 
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    <<: *conf
+
+  immich-redis:                               # 缓存服务
+    container_name: immich-redis
+    image: redis
+    expose: 
+      - "6379"
+    environment:
+      <<: *env
+    <<: *conf
+
+  immich-postgres:                                # 数据库
+    container_name: immich-postgres
+    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    environment:
+      <<: *env
+      POSTGRES_PASSWORD: "immich"       # 初始化数据库
+      POSTGRES_USER: "immich"
+      POSTGRES_DB: "immich"
+    ports:
+      - 5433:5432
+    volumes:
+      - ${DATA_PATH}/immich-pgdata:/var/lib/postgresql/data
+    <<: *conf
+# --------------------------------------------------------------------------------
+
+# 自定义网卡 驱动为桥接  这样的好处就是 比如我有10个redis缓存服务 只对容器服务 就是让容器去调用它 我自己也没有访问它的需求 不需要做-p端口映射的操作 那么我只需要用主机名+默认端口的方式去访问就可以 因为在内部它是一个容器一个私有ip地址的 
+networks:
+  mynet:
+    name: mnet
+    driver: bridge
