@@ -4,7 +4,7 @@
 ipaddr=$(ip a | grep /24 | awk '{print $2}' | awk -F "/" '{print $1}')
 appdata_path=""
 compose_path=""
-
+movie_data=""
 
 function mainmenu() {
 
@@ -18,14 +18,14 @@ function mainmenu() {
 	echo " --------------------------------------"
 	repo_changed=$(check_repo_changed)
 	echo -e " 1 \033[36m更换国内中科大源 — $repo_changed\033[0m"
-	echo -e " 2 \033[36m安装实用工具\033[0m"
+	echo -e " 2 \033[36m安装实用工具(必须先装★★★)\033[0m"
 	webmin_installed=$(check_webmin_installed)
 	echo -e " 3 \033[32m安装webmin — $webmin_installed\033[0m"
 	docker_installed=$(check_docker_installed)
 	echo -e " 4 \033[32m安装docker环境 — $docker_installed\033[0m"
 	echo -e " 5 \033[34m一键安装上面所有内容\033[0m"
 	dockge_installed=$(check_dockge_installed)
-	echo -e " 6 \033[34m安装dockge容器管理 — $dockge_installed\033[0m"
+	echo -e " 6 \033[34m安装dockge并导入all_in配置 — $dockge_installed\033[0m"
 	echo -e " 7 \033[33m设置静态IP地址\033[0m"
 	echo -----------------------------------------------
 	echo -e " 0 \033[31m退出脚本\033[0m"
@@ -103,6 +103,7 @@ function check_repo_changed(){
 function change_repo() {
 	if [ "$(check_repo_changed)" == "[已更换]" ]; then
 		echo "你已经换过了..."
+		apt update && apt upgrade -y && apt install nala -y
 	else
 	echo "正在更换源地址..."
 	mv /etc/apt/sources.list /etc/apt/sources.list.bak
@@ -133,8 +134,8 @@ function install_webmin() {
 	if [ "$(check_webmin_installed)" == "[已安装]" ]; then
 		echo "你已经安装过了..."
 	elif [ "$(check_repo_changed)" == "[已更换]" ]; then
-		wget https://mirror.ghproxy.com/https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
-		sh setup-repos.sh <<<"y"
+		wget -q -O /tmp/setup-repos.sh https://mirror.ghproxy.com/https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh
+		sh /tmp/setup-repos.sh <<<"y"
 		nala install -y --install-recommends webmin
 		echo -e " \033[32mwebmin安装成功，请用\033[0m\033[33;1;5mhttps://$ipaddr:10000\033[0m\033[32m访问后台\033[0m"
 		echo -e " \033[32m账户密码为服务器ssh的账户密码\033[0m"
@@ -180,28 +181,42 @@ function install_dockge() {
 	elif [ "$(check_docker_installed)" == "[已安装]" ]; then
 		echo "正在安装dockge管理面板..."
 		while true; do
-			read -p "请输入容器配置存放路径（以/开始的绝对路径）: " path_app
-			if ! check_path_exist "$path_app"; then
-				echo "你输入的路径不正确,请重新输入！"
+			read -p "请输入容器配置存放路径（ 以/开始的绝对路径 如：/disk1/appdata ): " appdata_path
+			if ! check_path_exist "$appdata_path"; then
+				echo "你输入的路径不存在,请创建后再试！"
 			else
-				echo "你输入的绝对路径是: $path_app"
-				appdata_path=$path_app
+				echo "你输入的绝对路径是: $appdata_path"
 				break
 			fi
 		done
 		while true; do
-			read -p "请输入compose持久化存放路径: " path_compose
-			if ! check_path_exist "$path_compose"; then
-				echo "你输入的路径不正确,请重新输入！"
+			read -p "请输入compose持久化存放路径( 以/开始的绝对路径 如：/disk1/compose ): " compose_path
+			if ! check_path_exist "$compose_path"; then
+				echo "你输入的路径不存在,请创建后再试！"
 			else
-				echo "你输入的绝对路径是: $path_compose"
-				compose_path=$path_compose
+				echo "你输入的绝对路径是: $compose_path"
 				break
 			fi
 		done
-		docker run -d --name dockge --restart unless-stopped -p 5001:5001 -v /var/run/docker.sock:/var/run/docker.sock -v "$appdata_path":/app/data -v "$compose_path":/opt/stacks -e DOCKGE_STACKS_DIR=/opt/stacks louislam/dockge	
+		while true; do
+			read -p "请输入媒体库的最上层存放路径( 以/开始的绝对路径 如：/disk2/movie_data ): " movie_data
+			if ! check_path_exist "$movie_data"; then
+				echo "你输入的路径不存在,请创建后再试！"
+			else
+				echo "你输入的绝对路径是: $movie_data"
+				break
+			fi
+		done
+		docker run -d --name dockge --restart unless-stopped -p 5001:5001 -v /var/run/docker.sock:/var/run/docker.sock -v "$appdata_path"/dockge:/app/data -v "$compose_path":/opt/stacks -e DOCKGE_STACKS_DIR=/opt/stacks louislam/dockge	
 	    if [[ $? == 0 ]]; then
-			echo -e " \033[32mdockge安装成功，请用\033[0m\033[33;1;5mhttp://$ipaddr:5001\033[0m\033[32m访问后台\033[0m"
+			echo -e " \033[32mdockge安装成功,正在导入all_in配置文件......\033[0m"
+			mkdir -p "$compose_path"/aio
+			wget -q -O "$compose_path"/aio/docker-compose.yml https://mirror.ghproxy.com/https://raw.githubusercontent.com/leesonaa/debian_init/main/docker-compose.yml
+			cat << EOF > "$compose_path"/aio/.env
+DATA_PATH=$appdata_path
+MOVIE_DATA=$movie_data
+EOF
+			echo -e " \033[32m请用\033[0m\033[33;1;5mhttp://$ipaddr:5001\033[0m\033[32m访问后台\033[0m"
 			echo "================================================================="
 	    else
 			echo "请检查dockge是否运行成功"
@@ -233,7 +248,7 @@ gateway $ip_gateway
 
 EOF
 	sudo systemctl restart NetworkManager
-	echo "静态ip已经设置完成，请退出脚本并reboot"
+	echo "静态ip已经设置完成,请退出脚本并reboot"
 }
 
 mainmenu

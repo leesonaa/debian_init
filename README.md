@@ -5,12 +5,13 @@ debian_init 国内环境 不换源=玩个鸡儿
 
 #### 软件架构
 目前针对debian12
+也可以自己改
 
 
 #### 使用说明
 
 ```
-wget -O /tmp/debian_init.sh https://gitee.com/leesona/debian_init/raw/main/debian_init.sh && bash /tmp/debian_init.sh 
+wget -q -O /tmp/debian_init.sh https://mirror.ghproxy.com/https://raw.githubusercontent.com/leesonaa/debian_init/main/debian_init.sh && bash /tmp/debian_init.sh 
 ```
 
 
