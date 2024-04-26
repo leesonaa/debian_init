@@ -18,15 +18,16 @@ function mainmenu() {
 	echo " --------------------------------------"
 	repo_changed=$(check_repo_changed)
 	echo -e " 1 \033[36m更换国内中科大源 — $repo_changed\033[0m"
-	echo -e " 2 \033[36m安装实用工具(必须先装★★★)\033[0m"
+	echo -e " 2 \033[36m安装实用工具\033[0m"
 	webmin_installed=$(check_webmin_installed)
 	echo -e " 3 \033[32m安装webmin — $webmin_installed\033[0m"
 	docker_installed=$(check_docker_installed)
 	echo -e " 4 \033[32m安装docker环境 — $docker_installed\033[0m"
-	echo -e " 5 \033[34m一键安装上面所有内容\033[0m"
 	dockge_installed=$(check_dockge_installed)
-	echo -e " 6 \033[34m安装dockge并导入all_in配置 — $dockge_installed\033[0m"
+	echo -e " 5 \033[34m安装dockge并导入all_in配置 — $dockge_installed\033[0m"
+	echo -e " 6 \033[34m一键安装以上所有内容\033[0m"
 	echo -e " 7 \033[33m设置静态IP地址\033[0m"
+	echo -e " 8 \033[33m备份docker应用数据\033[0m"
 	echo -----------------------------------------------
 	echo -e " 0 \033[31m退出脚本\033[0m"
 	read -p "请输入对应数字 > " num
@@ -39,7 +40,6 @@ function mainmenu() {
 		change_repo
 		
 	elif [ "$num" = 2 ]; then
-		
 		install_tool
 		
 	elif [ "$num" = 3 ]; then
@@ -49,15 +49,16 @@ function mainmenu() {
 		install_docker
 		
 	elif [ "$num" = 5 ]; then
-		
-		onekey
+		install_dockge
 		
 	elif [ "$num" = 6 ]; then
+		onekey
 		
-		install_dockge
 	elif [ "$num" = 7 ]; then
-		
 		set_static_addree
+
+	elif [ "$num" = 8 ]; then
+		backup_data
 		
 	else
 		echo -e "\033[31m请输入正确的数字！\033[0m"
@@ -92,7 +93,7 @@ function check_webmin_installed() {
 }
 
 function check_repo_changed(){
-	if grep -q "ustc" /etc/apt/sources.list; then
+	if [ -f /etc/apt/sources.d/debian.sources ] ; then
 	    echo "[已更换]"   
 	else
 	    echo "[未更换]"
@@ -107,11 +108,18 @@ function change_repo() {
 	else
 	echo "正在更换源地址..."
 	mv /etc/apt/sources.list /etc/apt/sources.list.bak
-	cat <<EOF >/etc/apt/sources.list
-deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free non-free-firmware
-deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main contrib non-free non-free-firmware
+	cat <<EOF >/etc/apt/sources.list.d/debian.sources
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian
+Suites: bookworm bookworm-updates bookworm-backports
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian-security
+Suites: bookworm-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 EOF
 	echo -e " \033[32m 中科大源替换完成,正在更新系统...\033[0m"
 	apt update && apt upgrade -y && apt install nala -y
@@ -164,6 +172,8 @@ function onekey() {
 	install_tool
 	install_docker
 	install_webmin
+        install_dockge
+
 }
 
 function check_path_exist() {
@@ -181,7 +191,7 @@ function install_dockge() {
 	elif [ "$(check_docker_installed)" == "[已安装]" ]; then
 		echo "正在安装dockge管理面板..."
 		while true; do
-			read -p "请输入容器配置存放路径（ 以/开始的绝对路径 如：/disk1/appdata ): " appdata_path
+			read -p "请输入容器配置存放路径（以/开始的绝对路径 如：/disk1/appdata ）: " appdata_path
 			if ! check_path_exist "$appdata_path"; then
 				echo "你输入的路径不存在,请创建后再试！"
 			else
@@ -190,7 +200,7 @@ function install_dockge() {
 			fi
 		done
 		while true; do
-			read -p "请输入compose持久化存放路径( 以/开始的绝对路径 如：/disk1/compose ): " compose_path
+			read -p "请输入compose持久化存放路径(以/开始的绝对路径 如：/disk1/compose): " compose_path
 			if ! check_path_exist "$compose_path"; then
 				echo "你输入的路径不存在,请创建后再试！"
 			else
@@ -199,7 +209,7 @@ function install_dockge() {
 			fi
 		done
 		while true; do
-			read -p "请输入媒体库的最上层存放路径( 以/开始的绝对路径 如：/disk2/movie_data ): " movie_data
+			read -p "请输入媒体库的最上层存放路径(以/开始的绝对路径 如：/disk2/movie_data): " movie_data
 			if ! check_path_exist "$movie_data"; then
 				echo "你输入的路径不存在,请创建后再试！"
 			else
@@ -209,7 +219,7 @@ function install_dockge() {
 		done
 		docker run -d --name dockge --restart unless-stopped -p 5001:5001 -v /var/run/docker.sock:/var/run/docker.sock -v "$appdata_path"/dockge:/app/data -v "$compose_path":/opt/stacks -e DOCKGE_STACKS_DIR=/opt/stacks louislam/dockge	
 	    if [[ $? == 0 ]]; then
-			echo -e " \033[32mdockge安装成功,正在导入all_in配置文件......\033[0m"
+			echo -e " \033[32mdockge安装成功，正在导入all_in配置文件......\033[0m"
 			mkdir -p "$compose_path"/aio
 			wget -q -O "$compose_path"/aio/docker-compose.yml https://mirror.ghproxy.com/https://raw.githubusercontent.com/leesonaa/debian_init/main/docker-compose.yml
 			cat << EOF > "$compose_path"/aio/.env
@@ -248,7 +258,24 @@ gateway $ip_gateway
 
 EOF
 	sudo systemctl restart NetworkManager
-	echo "静态ip已经设置完成,请退出脚本并reboot"
+	echo "静态ip已经设置完成，请退出脚本并reboot"
 }
+
+
+function backup_data(){
+	while true; do
+		read -p "请输入 <存放容器配置or存放compose文件> 的路径（以/开始的绝对路径 如：/disk1/appdata ）: " appdata_path
+		if ! check_path_exist "$appdata_path"; then
+			echo "你输入的路径不存在,你确定是放在这里?"
+		else
+			echo "你输入的容器配置路径是: $appdata_path"
+			break
+		fi
+	done
+	echo "请稍等,正在打包数据..."
+	tar -zcf ~/appdata.tar.gz $appdata_path/.. 
+	echo "打包已经完成,请退出脚本并执行 cd 回车 ls 即可看到压缩文件."
+}
+
 
 mainmenu
