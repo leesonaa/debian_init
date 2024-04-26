@@ -93,7 +93,7 @@ function check_webmin_installed() {
 }
 
 function check_repo_changed(){
-	if [ -f /etc/apt/sources.d/debian.sources ] ; then
+	if [ -f /etc/apt/sources.list.d/debian.sources ]; then
 	    echo "[已更换]"   
 	else
 	    echo "[未更换]"
