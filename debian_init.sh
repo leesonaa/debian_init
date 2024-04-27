@@ -28,6 +28,7 @@ function mainmenu() {
 	echo -e " 6 \033[34m一键安装以上所有内容\033[0m"
 	echo -e " 7 \033[33m设置静态IP地址\033[0m"
 	echo -e " 8 \033[33m备份docker应用数据\033[0m"
+	echo -e " 9 \033[31m转移docker存储路径(系统盘容量不足可以尝试)\033[0m"
 	echo -----------------------------------------------
 	echo -e " 0 \033[31m退出脚本\033[0m"
 	read -p "请输入对应数字 > " num
@@ -59,7 +60,9 @@ function mainmenu() {
 
 	elif [ "$num" = 8 ]; then
 		backup_data
-		
+	
+	elif [ "$num" = 9 ]; then
+	    move_docker_root	
 	else
 		echo -e "\033[31m请输入正确的数字！\033[0m"
 		
@@ -100,6 +103,14 @@ function check_repo_changed(){
 	fi	
 }
 
+
+function check_daemon(){
+	if [ -f /etc/docker/daemon.json ]; then
+		return 0
+	else
+		return 1
+	fi
+}
 
 function change_repo() {
 	if [ "$(check_repo_changed)" == "[已更换]" ]; then
@@ -172,7 +183,7 @@ function onekey() {
 	install_tool
 	install_docker
 	install_webmin
-        install_dockge
+    install_dockge
 
 }
 
@@ -275,6 +286,42 @@ function backup_data(){
 	echo "请稍等,正在打包数据..."
 	tar -zcf ~/appdata.tar.gz $appdata_path/.. 
 	echo "打包已经完成,请退出脚本并执行 cd 回车 ls 即可看到压缩文件."
+}
+
+
+function move_docker_root(){
+	echo -e "\033[31m此为转移docker的默认路径,接下来会停止docker容器和服务,你确定你需要这么做? (y/n): \033[0m" answer 
+	if [ "$answer" == "y" ]; then
+		docker stop $(docker ps -aq)
+		systemctl stop docker.service docker.socket
+		if [[ $? == 0 ]]; then
+			read -p "请输入你要转移的目录路径（如 /disk1/docker_root ): " move_path
+			if ! check_path_exist "$move_path"; then
+				echo "你输入的路径不存在,请先创建文件夹!"
+			else
+				echo "你输入的路径是: '$move_path',正在转移..."
+				cp -r /var/lib/docker/* $move_path/
+				if [ $(check_daemon) == 0 ]; then
+					sed -i '/{/a "data-root": "'$move_path'",' /etc/docker/daemon.json
+				else
+					echo -e '{\n\t"data-root": "'$move_path'"\n}' > /etc/docker/daemon.json
+					
+				fi
+				systemctl restart docker
+				if [ $? == 0 ]; then
+					rm -rf /var/lib/docker
+					echo "已完成转移!"
+				eles
+					echo "转移失败!"
+				fi
+			fi
+		else
+		  echo "服务停止失败,请重启后再试"	
+		fi
+	else 
+	  echo "操作已取消!"	
+	fi
+
 }
 
 
