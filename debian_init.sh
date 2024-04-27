@@ -290,7 +290,8 @@ function backup_data(){
 
 
 function move_docker_root(){
-	echo -e "\033[31m此为转移docker的默认路径,接下来会停止docker容器和服务,你确定你需要这么做? (y/n): \033[0m" answer 
+	echo -e "\033[31m此为转移docker的默认路径,接下来会停止docker容器和服务!\033[0m"
+ 	read -p "确定需要这么做?请输入(y/n): " answer 
 	if [ "$answer" == "y" ]; then
 		docker stop $(docker ps -aq)
 		systemctl stop docker.service docker.socket
