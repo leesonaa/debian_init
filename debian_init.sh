@@ -228,7 +228,7 @@ function install_dockge() {
 				break
 			fi
 		done
-		docker run -d --name dockge --restart unless-stopped -p 5001:5001 -v /var/run/docker.sock:/var/run/docker.sock -v "$appdata_path"/dockge:/app/data -v "$compose_path":/opt/stacks -e DOCKGE_STACKS_DIR=/opt/stacks louislam/dockge	
+		docker run -d --name dockge --restart always -p 5001:5001 -v /var/run/docker.sock:/var/run/docker.sock -v "$appdata_path"/dockge:/app/data -v "$compose_path":/opt/stacks -e DOCKGE_STACKS_DIR=/opt/stacks louislam/dockge	
 	    if [[ $? == 0 ]]; then
 			echo -e " \033[32mdockge安装成功，正在导入all_in配置文件......\033[0m"
 			mkdir -p "$compose_path"/aio
@@ -268,8 +268,13 @@ netmask 255.255.255.0
 gateway $ip_gateway
 
 EOF
-	systemctl restart NetworkManager
-	echo "静态ip已经设置完成，请退出脚本并reboot"
+	read -p "静态ip已经设置完成!请问是否需要重启设备生效? (y/n):" chose
+	if [ "$chose" == "y" ]; then
+		echo "重启后请用新的ip登录!!!"
+		reboot
+	else
+		echo "下次重启后会自动生效,请记住设定的IP!!!"
+	fi
 }
 
 
