@@ -302,7 +302,7 @@ function move_docker_root(){
 			else
 				echo "你输入的路径是: '$move_path',正在转移..."
 				cp -r /var/lib/docker/* $move_path/
-				if [ $(check_daemon) == 0 ]; then
+				if [ "$check_daemon" == 0 ]; then
 					sed -i '/{/a "data-root": "'$move_path'",' /etc/docker/daemon.json
 				else
 					echo -e '{\n\t"data-root": "'$move_path'"\n}' > /etc/docker/daemon.json
@@ -311,8 +311,9 @@ function move_docker_root(){
 				systemctl restart docker
 				if [ $? == 0 ]; then
 					rm -rf /var/lib/docker
+     					docker restart dockge
 					echo "已完成转移!"
-				eles
+				else
 					echo "转移失败!"
 				fi
 			fi
