@@ -268,7 +268,7 @@ netmask 255.255.255.0
 gateway $ip_gateway
 
 EOF
-	sudo systemctl restart NetworkManager
+	systemctl restart NetworkManager
 	echo "静态ip已经设置完成，请退出脚本并reboot"
 }
 
