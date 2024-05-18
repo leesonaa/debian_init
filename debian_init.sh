@@ -6,6 +6,7 @@ appdata_path=""
 compose_path=""
 movie_data=""
 
+
 function mainmenu() {
 
 	echo -e " \033[33;1;5m<欢迎使用 debian12一键初始化建议脚本>\033[0m"
@@ -29,6 +30,8 @@ function mainmenu() {
 	echo -e " 7 \033[33m设置静态IP地址\033[0m"
 	echo -e " 8 \033[33m备份docker应用数据\033[0m"
 	echo -e " 9 \033[31m转移docker存储路径(系统盘容量不足可以尝试)\033[0m"
+	isdisabled=$(isdisable_ramlog)
+	echo -e " a \033[31m关掉armbian的ramlog — $isdisabled\033[0m"
 	echo -----------------------------------------------
 	echo -e " 0 \033[31m退出脚本\033[0m"
 	read -p "请输入对应数字 > " num
@@ -63,12 +66,49 @@ function mainmenu() {
 	
 	elif [ "$num" = 9 ]; then
 	    move_docker_root	
+	elif [ "$num" = a ]; then
+	    disable_ramlog	
 	else
 		echo -e "\033[31m请输入正确的数字！\033[0m"
 		
 	fi
 	mainmenu
 	
+}
+
+function disable_ramlog() {
+    if [ -f /etc/default/armbian-ramlog ]; then
+        sed -i 's/ENABLED=true/ENABLED=false/' /etc/default/armbian-ramlog
+        echo "禁用完成,是否重启设备?(y/n)"
+        read -r yn
+        if [ "$yn" == "y" ]; then
+            reboot
+        else
+            echo "请稍后自行重启!"
+        fi
+    else
+        echo "文件不存在!!!"
+    fi
+}
+
+function isdisable_ramlog() {
+    ramlog=$(grep "ENABLED=" /etc/default/armbian-ramlog | awk -F'=' '{print $2}')
+    if [[ $ramlog == "false" ]]; then
+        echo "[已禁用]"
+    elif [[ $ramlog == "true" ]]; then
+        echo "[未禁用]"
+    else
+        echo "[未知状态]"
+    fi
+}
+
+function check_os_type(){
+    ret=$(head -1 /etc/os-release | grep -c Armbian)
+    if [[ $ret -eq 1 ]]; then
+        return 0
+    else
+        return -1
+    fi
 }
 
 function check_dockge_installed() {
@@ -115,11 +155,14 @@ function check_daemon(){
 function change_repo() {
 	if [ "$(check_repo_changed)" == "[已更换]" ]; then
 		echo "你已经换过了..."
-		apt update && apt upgrade -y && apt install nala -y
-	else
-	echo "正在更换源地址..."
-	mv /etc/apt/sources.list /etc/apt/sources.list.bak
-	cat <<EOF >/etc/apt/sources.list.d/debian.sources
+	elif [[ "$(check_os_type)" -eq 0 ]];then
+		echo "正在更换源地址..."
+		mv /etc/apt/sources.list.d/armbian.list /etc/apt/sources.list.d/armbian.list.bak
+		cat <<EOF> /etc/apt/sources.list.d/armbian.list
+deb [signed-by=/usr/share/keyrings/armbian.gpg] https://mirrors.ustc.edu.cn/armbian/ bookworm main bookworm-utils bookworm-desktop
+EOF
+		mv /etc/apt/sources.list /etc/apt/sources.list.bak
+		cat <<EOF >/etc/apt/sources.list.d/debian.sources
 Types: deb
 URIs: https://mirrors.ustc.edu.cn/debian
 Suites: bookworm bookworm-updates bookworm-backports
@@ -133,8 +176,24 @@ Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 EOF
 	echo -e " \033[32m 中科大源替换完成,正在更新系统...\033[0m"
-	apt update && apt upgrade -y && apt install nala -y
+ 	else
+		mv /etc/apt/sources.list /etc/apt/sources.list.bak
+		cat <<EOF >/etc/apt/sources.list.d/debian.sources
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian
+Suites: bookworm bookworm-updates bookworm-backports
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian-security
+Suites: bookworm-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+	echo -e " \033[32m 中科大源替换完成,正在更新系统...\033[0m"	
 	fi
+	apt update && apt upgrade -y && apt install nala -y
 }
 
 function install_tool() {
@@ -330,6 +389,5 @@ function move_docker_root(){
 	fi
 
 }
-
 
 mainmenu
