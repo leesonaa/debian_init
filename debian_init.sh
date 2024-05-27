@@ -77,7 +77,7 @@ function mainmenu() {
 }
 
 function disable_ramlog() {
-    if [ -f /etc/default/armbian-ramlog ]; then
+    if [[ -f /etc/default/armbian-ramlog ]] && [[ "$(isdisable_ramlog)" == "[未禁用]" ]]; then
         sed -i 's/ENABLED=true/ENABLED=false/' /etc/default/armbian-ramlog
         echo "禁用完成,是否重启设备?(y/n)"
         read -r yn
@@ -87,28 +87,30 @@ function disable_ramlog() {
             echo "请稍后自行重启!"
         fi
     else
-        echo "文件不存在!!!"
+        echo "文件不存在或者你已经替换过了！"
     fi
 }
 
 function isdisable_ramlog() {
-    ramlog=$(grep "ENABLED=" /etc/default/armbian-ramlog | awk -F'=' '{print $2}')
-    if [[ $ramlog == "false" ]]; then
-        echo "[已禁用]"
-    elif [[ $ramlog == "true" ]]; then
-        echo "[未禁用]"
+	if [ -f /etc/default/armbian-ramlog ];then
+		ramlog=$(grep "ENABLED=" /etc/default/armbian-ramlog | awk -F'=' '{print $2}')
+    	if [[ $ramlog == "false" ]]; then
+        	echo "[已禁用]"
+    	elif [[ $ramlog == "true" ]]; then
+        	echo "[未禁用]"
+    	fi
     else
-        echo "[未知状态]"
+        echo "[你不是armbian系统]"
     fi
 }
 
 function check_os_type(){
-    ret=$(head -1 /etc/os-release | grep -c Armbian)
-    if [[ $ret -eq 1 ]]; then
-        return 0
-    else
-        return -1
-    fi
+	if head -1 /etc/os-release | grep -c Armbian;then
+		# head 返回0 不是armbian 函数返回0
+		return 1
+	else
+		return 0
+	fi
 }
 
 function check_dockge_installed() {
@@ -155,8 +157,25 @@ function check_daemon(){
 function change_repo() {
 	if [ "$(check_repo_changed)" == "[已更换]" ]; then
 		echo "你已经换过了..."
-	elif [[ "$(check_os_type)" -eq 0 ]];then
-		echo "正在更换源地址..."
+	elif check_os_type;then
+ 		echo "正在替换debian源地址..."
+		mv /etc/apt/sources.list /etc/apt/sources.list.bak
+		cat <<EOF >/etc/apt/sources.list.d/debian.sources
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian
+Suites: bookworm bookworm-updates bookworm-backports
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://mirrors.ustc.edu.cn/debian-security
+Suites: bookworm-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+	echo -e " \033[32m 中科大源替换完成,正在更新系统...\033[0m"	
+ 	else
+		echo "正在更换armbian源地址..."
 		mv /etc/apt/sources.list.d/armbian.list /etc/apt/sources.list.d/armbian.list.bak
 		cat <<EOF> /etc/apt/sources.list.d/armbian.list
 deb [signed-by=/usr/share/keyrings/armbian.gpg] https://mirrors.ustc.edu.cn/armbian/ bookworm main bookworm-utils bookworm-desktop
@@ -176,24 +195,8 @@ Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 EOF
 	echo -e " \033[32m 中科大源替换完成,正在更新系统...\033[0m"
- 	else
-		mv /etc/apt/sources.list /etc/apt/sources.list.bak
-		cat <<EOF >/etc/apt/sources.list.d/debian.sources
-Types: deb
-URIs: https://mirrors.ustc.edu.cn/debian
-Suites: bookworm bookworm-updates bookworm-backports
-Components: main contrib non-free non-free-firmware
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-
-Types: deb
-URIs: https://mirrors.ustc.edu.cn/debian-security
-Suites: bookworm-security
-Components: main contrib non-free non-free-firmware
-Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-EOF
-	echo -e " \033[32m 中科大源替换完成,正在更新系统...\033[0m"	
 	fi
-	apt update && apt upgrade -y && apt install nala -y
+apt update && apt install nala -y
 }
 
 function install_tool() {
