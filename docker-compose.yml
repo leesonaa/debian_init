@@ -355,6 +355,8 @@ services:
       #DB_PORT=5432 #optional
       #REDIS_PORT=6379 #optional
       #REDIS_PASSWORD= #optional
+      MACHINE_LEARNING_HOST: "0.0.0.0"
+      MACHINE_LEARNING_PORT: "3003"
       MACHINE_LEARNING_WORKERS: "1" #optional   打开机器学习 老旧设备如果效果不好请关闭 设置为 0
       MACHINE_LEARNING_WORKER_TIMEOUT: "120" #optional    机器学习超时  120秒
       #HTTP_PROXY: "http://v2:20172"          # 这2个是给容器传递科学环境的 环境变量 
